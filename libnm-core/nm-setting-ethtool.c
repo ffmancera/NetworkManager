@@ -42,6 +42,22 @@ nm_ethtool_optname_is_feature (const char *optname)
 	return optname && nm_ethtool_id_is_feature (nm_ethtool_id_get_by_name (optname));
 }
 
+/**
+ * nm_ethtool_optname_is_coalesce:
+ * @optname: (allow-none): the option name to check
+ *
+ * Checks whether @optname is a valid option name for a coalesce setting.
+ *
+ * %Returns: %TRUE, if @optname is valid
+ *
+ * Since: 1.26
+ */
+gboolean
+nm_ethtool_optname_is_coalesce (const char *optname)
+{
+	return optname && nm_ethtool_id_is_coalesce (nm_ethtool_id_get_by_name (optname));
+}
+
 /*****************************************************************************/
 
 /**
@@ -239,6 +255,69 @@ nm_setting_ethtool_init_features (NMSettingEthtool *setting,
 	return n_req;
 }
 
+/**
+ * nm_setting_ethtool_get_coalesce:
+ * @setting: the #NMSettingEthtool
+ * @optname: option name of the coalescing setting to get
+ *
+ * Gets a coalescing setting.
+ *
+ * Note that @optname must be a valid name for a setting, according to
+ * nm_ethtool_optname_is_coalesce().
+ *
+ * Returns: the coalesce setting value or %NULL if unset.
+ *
+ * Since: 1.26
+ */
+const char *
+nm_setting_ethtool_get_coalesce (NMSettingEthtool *setting,
+                                 const char *optname)
+{
+	GVariant *v;
+
+	g_return_val_if_fail (NM_IS_SETTING_ETHTOOL (setting), NULL);
+	g_return_val_if_fail (optname && nm_ethtool_optname_is_coalesce (optname), NULL);
+
+	v = nm_setting_gendata_get (NM_SETTING (setting), optname);
+	if (   v
+	    && g_variant_is_of_type (v, G_VARIANT_TYPE_STRING)) {
+		return g_variant_get_string (v, NULL);
+	}
+	return NULL;
+}
+
+/**
+ * nm_setting_ethtool_set_coalesce:
+ * @setting: the #NMSettingEthtool
+ * @optname: option name of the coalesce setting
+ * @value: the new value to set.
+ *
+ * Sets a coalesce setting.
+ *
+ * Note that @optname must be a valid name for a coalesce setting, according to
+ * nm_ethtool_optname_is_coalesce().
+ *
+ * Since: 1.26
+ */
+void
+nm_setting_ethtool_set_coalesce (NMSettingEthtool *setting,
+                                 const char *optname,
+                                 const char *value)
+{
+	GHashTable *ht;
+
+	g_return_if_fail (NM_IS_SETTING_ETHTOOL (setting));
+	g_return_if_fail (optname && nm_ethtool_optname_is_coalesce (optname));
+
+	ht = _nm_setting_gendata_hash (NM_SETTING (setting),
+	                               TRUE);
+
+	g_hash_table_insert (ht,
+	                     g_strdup (optname),
+	                     g_variant_ref_sink (g_variant_new_string (value)));
+	_notify_attributes (setting);
+}
+
 /*****************************************************************************/
 
 /**
@@ -284,19 +363,29 @@ verify (NMSetting *setting, NMConnection *connection, GError **error)
 
 	g_hash_table_iter_init (&iter, hash);
 	while (g_hash_table_iter_next (&iter, (gpointer *) &optname, (gpointer *) &variant)) {
-		if (!nm_ethtool_optname_is_feature (optname)) {
+		if (nm_ethtool_optname_is_feature (optname)) {
+			if (!g_variant_is_of_type (variant, G_VARIANT_TYPE_BOOLEAN)) {
+				g_set_error_literal (error,
+				                     NM_CONNECTION_ERROR,
+				                     NM_CONNECTION_ERROR_INVALID_PROPERTY,
+				                     _("offload feature has invalid variant type"));
+				g_prefix_error (error, "%s.%s: ", NM_SETTING_ETHTOOL_SETTING_NAME, optname);
+				return FALSE;
+			}
+		} else if (nm_ethtool_optname_is_coalesce (optname)) {
+			if (!g_variant_is_of_type (variant, G_VARIANT_TYPE_STRING)) {
+				g_set_error_literal (error,
+				                     NM_CONNECTION_ERROR,
+				                     NM_CONNECTION_ERROR_INVALID_PROPERTY,
+				                     _("coalesce setting has invalid variant type"));
+				g_prefix_error (error, "%s.%s: ", NM_SETTING_ETHTOOL_SETTING_NAME, optname);
+				return FALSE;
+			}
+		} else {
 			g_set_error_literal (error,
 			                     NM_CONNECTION_ERROR,
 			                     NM_CONNECTION_ERROR_INVALID_PROPERTY,
-			                     _("unsupported offload feature"));
-			g_prefix_error (error, "%s.%s: ", NM_SETTING_ETHTOOL_SETTING_NAME, optname);
-			return FALSE;
-		}
-		if (!g_variant_is_of_type (variant, G_VARIANT_TYPE_BOOLEAN)) {
-			g_set_error_literal (error,
-			                     NM_CONNECTION_ERROR,
-			                     NM_CONNECTION_ERROR_INVALID_PROPERTY,
-			                     _("offload feature has invalid variant type"));
+			                     _("unsupported ethtool setting"));
 			g_prefix_error (error, "%s.%s: ", NM_SETTING_ETHTOOL_SETTING_NAME, optname);
 			return FALSE;
 		}
@@ -315,6 +404,9 @@ get_variant_type (const NMSettInfoSetting *sett_info,
 {
 	if (nm_ethtool_optname_is_feature (name))
 		return G_VARIANT_TYPE_BOOLEAN;
+
+	if (nm_ethtool_optname_is_coalesce (name))
+		return G_VARIANT_TYPE_STRING;
 
 	g_set_error (error,
 	             NM_CONNECTION_ERROR,

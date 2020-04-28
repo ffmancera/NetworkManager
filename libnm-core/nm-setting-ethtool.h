@@ -68,9 +68,14 @@ G_BEGIN_DECLS
 #define NM_ETHTOOL_OPTNAME_FEATURE_TX_UDP_TNL_CSUM_SEGMENTATION "feature-tx-udp_tnl-csum-segmentation"
 #define NM_ETHTOOL_OPTNAME_FEATURE_TX_UDP_TNL_SEGMENTATION      "feature-tx-udp_tnl-segmentation"
 #define NM_ETHTOOL_OPTNAME_FEATURE_TX_VLAN_STAG_HW_INSERT       "feature-tx-vlan-stag-hw-insert"
+#define NM_ETHTOOL_OPTNAME_COALESCE_ADAPTIVE_RX                 "coalesce-adaptive-rx"
+#define NM_ETHTOOL_OPTNAME_COALESCE_ADAPTIVE_TX                 "coalesce-adaptive-tx"
 
 NM_AVAILABLE_IN_1_20
 gboolean nm_ethtool_optname_is_feature (const char *optname);
+
+NM_AVAILABLE_IN_1_26
+gboolean nm_ethtool_optname_is_coalesce (const char *optname);
 
 /*****************************************************************************/
 
@@ -108,6 +113,15 @@ void              nm_setting_ethtool_clear_features (NMSettingEthtool *setting);
 NM_AVAILABLE_IN_1_20
 const char **     nm_setting_ethtool_get_optnames (NMSettingEthtool *setting,
                                                    guint *out_length);
+
+NM_AVAILABLE_IN_1_26
+const char * nm_setting_ethtool_get_coalesce (NMSettingEthtool *setting,
+                                              const char *optname);
+
+NM_AVAILABLE_IN_1_26
+void nm_setting_ethtool_set_coalesce (NMSettingEthtool *setting,
+                                      const char *optname,
+                                      const char *value);
 
 G_END_DECLS
 

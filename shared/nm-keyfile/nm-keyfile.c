@@ -3260,6 +3260,22 @@ _read_setting (KeyfileReaderInfo *info)
 						continue;
 					}
 					variant = g_variant_new_boolean (v);
+				} else if (g_variant_type_equal (variant_type, G_VARIANT_TYPE_STRING)) {
+					const char *v;
+
+					v = g_key_file_get_string (info->keyfile,
+					                           info->group,
+					                           key,
+					                           &local);
+
+					if (local) {
+						if (!handle_warn (info, key, NM_KEYFILE_WARN_SEVERITY_WARN,
+						                  _("key '%s.%s' is not a string"),
+						                  info->group, key))
+							break;
+						continue;
+					}
+					variant = g_variant_new_string (v);
 				} else {
 					nm_assert_not_reached ();
 					continue;
@@ -3868,6 +3884,11 @@ nm_keyfile_write (NMConnection *connection,
 						                        setting_name,
 						                        key,
 						                        g_variant_get_boolean (v));
+					} else if (g_variant_is_of_type (v, G_VARIANT_TYPE_STRING)) {
+						g_key_file_set_string (info.keyfile,
+						                       setting_name,
+						                       key,
+						                       g_variant_get_string (v, NULL));
 					} else {
 						/* BUG: The variant type is not implemented. Since the connection
 						 * verifies, this can only mean we either wrongly didn't reject
